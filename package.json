@@ -1,0 +1,19 @@
+{
+  "name": "katha",
+  "version": "2.0.0",
+  "description": "Katha — Editorial live transcription and multilingual voice bridge",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["accessibility", "stt", "tts", "indic", "katha", "live-captions"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "ws": "^8.22.2"
+  }
+}
