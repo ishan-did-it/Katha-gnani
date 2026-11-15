@@ -6,7 +6,7 @@ Built for the Great Indian AI Internship Challenge by Gnani AI, using Gnani Pris
 - **Live demo:** https://YOUR-SERVICE-NAME.onrender.com *(free hosting: the first load can take up to a minute)*
 - **Demo video / post:** PASTE-YOUR-LINKEDIN-POST-LINK
 
-![Katha screenshot](docs/screenshot.png)
+![Katha screenshot](docs/Screenshot.png)
 
 ## The problem
 
