@@ -65,6 +65,52 @@ function callTTS(payload) {
   });
 }
 
+// Scale 16-bit PCM WAV audio so its loudest sample reaches about 90% of full scale.
+// Replies that come back quiet get louder; replies that are already loud are left alone.
+function normalizeWav(buf) {
+  try {
+    if (buf.length < 44 || buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WAVE') return buf;
+    let pos = 12;
+    let fmt = null;
+    let dataStart = -1;
+    let dataLen = 0;
+    while (pos + 8 <= buf.length) {
+      const id = buf.toString('ascii', pos, pos + 4);
+      let size = buf.readUInt32LE(pos + 4);
+      const body = pos + 8;
+      if (id === 'fmt ') {
+        fmt = { format: buf.readUInt16LE(body), bits: buf.readUInt16LE(body + 14) };
+      }
+      if (id === 'data') {
+        if (size === 0 || body + size > buf.length) size = buf.length - body;
+        dataStart = body;
+        dataLen = size;
+        break;
+      }
+      pos = body + size + (size % 2);
+    }
+    if (!fmt || (fmt.format !== 1 && fmt.format !== 0xfffe) || fmt.bits !== 16 || dataStart < 0) return buf;
+    const n = Math.floor(dataLen / 2);
+    let peak = 0;
+    for (let i = 0; i < n; i++) {
+      const v = Math.abs(buf.readInt16LE(dataStart + i * 2));
+      if (v > peak) peak = v;
+    }
+    if (peak < 100) return buf;                       // essentially silence
+    let gain = (0.9 * 32767) / peak;
+    if (gain <= 1.05) return buf;                     // already loud
+    gain = Math.min(gain, 8);
+    const out = Buffer.from(buf);
+    for (let i = 0; i < n; i++) {
+      const v = Math.round(out.readInt16LE(dataStart + i * 2) * gain);
+      out.writeInt16LE(Math.max(-32768, Math.min(32767, v)), dataStart + i * 2);
+    }
+    return out;
+  } catch (_) {
+    return buf;
+  }
+}
+
 async function handleTTS(req, res) {
   if (ttsLimited(req.ip)) {
     return res.status(429).json({ error: 'Too many spoken replies. Please wait a few minutes.' });
@@ -105,7 +151,7 @@ async function handleTTS(req, res) {
     }
     if (!r.ok) return res.status(502).json({ error: 'Text to speech failed', detail: lastDetail });
 
-    const audio = Buffer.from(await r.arrayBuffer());
+    const audio = normalizeWav(Buffer.from(await r.arrayBuffer()));
     res.set('Content-Type', 'audio/wav');
     res.send(audio);
   } catch (err) {

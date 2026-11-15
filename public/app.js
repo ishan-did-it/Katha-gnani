@@ -448,12 +448,46 @@
   }
 
   // ---------- Spoken reply ----------
+  // Spoken replies go through a gain stage plus a limiter so they are clearly audible.
+  const REPLY_GAIN = 2.0;
+  let playCtx = null;
+  function getPlayCtx() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!playCtx) playCtx = new AC();
+    if (playCtx.state === 'suspended') playCtx.resume().catch(() => {});
+    return playCtx;
+  }
+  async function playLoud(arrayBuffer) {
+    const ctx = getPlayCtx();
+    if (!ctx) throw new Error('Web Audio is not available');
+    const buf = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    await new Promise((resolve) => {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const gain = ctx.createGain();
+      gain.gain.value = REPLY_GAIN;
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -8;
+      limiter.knee.value = 4;
+      limiter.ratio.value = 14;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.15;
+      src.connect(gain);
+      gain.connect(limiter);
+      limiter.connect(ctx.destination);
+      src.onended = resolve;
+      src.start();
+    });
+  }
+
   async function speak(raw, language) {
     const text = (raw || '').trim();
     if (!text) return;
     addLine(text, 'you');
     state.paused = true;
     setStatus('busy', 'Speaking');
+    getPlayCtx();   // create and resume the audio context inside the tap
     try {
       const r = await fetch('/api/tts', {
         method: 'POST',
@@ -461,14 +495,20 @@
         body: JSON.stringify({ text, language: language || 'auto' }),
       });
       if (!r.ok) throw new Error('Text to speech failed (' + r.status + ')');
-      const url = URL.createObjectURL(await r.blob());
-      const audio = new Audio(url);
-      await new Promise((resolve, reject) => {
-        audio.onended = resolve;
-        audio.onerror = () => reject(new Error('Could not play audio.'));
-        audio.play().catch(reject);
-      });
-      URL.revokeObjectURL(url);
+      const data = await r.arrayBuffer();
+      try {
+        await playLoud(data);
+      } catch (_) {
+        // fall back to a plain audio element if the louder path fails
+        const url = URL.createObjectURL(new Blob([data], { type: 'audio/wav' }));
+        const audio = new Audio(url);
+        await new Promise((resolve, reject) => {
+          audio.onended = resolve;
+          audio.onerror = () => reject(new Error('Could not play audio.'));
+          audio.play().catch(reject);
+        });
+        URL.revokeObjectURL(url);
+      }
     } catch (e) {
       showError(e.message || 'Could not speak reply.');
     } finally {
