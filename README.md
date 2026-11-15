@@ -4,7 +4,7 @@
 Built for the Great Indian AI Internship Challenge by Gnani AI, using Gnani Prisma (speech-to-text) and Gnani Timbre (text-to-speech).
 
 - **Live demo:** https://YOUR-SERVICE-NAME.onrender.com *(free hosting: the first load can take up to a minute)*
-- **Demo video / post:** PASTE-YOUR-LINKEDIN-POST-LINK
+- **Demo video / post:** https://lnkd.in/p/gfs7ghdf
 
 ![Katha screenshot](docs/Screenshot.png)
 
